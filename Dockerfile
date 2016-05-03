@@ -33,7 +33,9 @@ ENV NO_INTERACTION 1
 RUN git clone https://github.com/preillyme/v8js.git /usr/local/src/v8js && \
     cd /usr/local/src/v8js && phpize && ./configure --with-v8js=/usr/local && \
     make all test install && \
+    echo extension=v8js.so > /etc/php/7.0/cli/conf.d/99-v8js.ini && \
     echo extension=v8js.so > /etc/php/7.0/fpm/conf.d/99-v8js.ini && \
     chmod 0777 /etc/php/7.0/fpm/conf.d/99-v8js.ini && \
+    chmod 0777 /etc/php/7.0/cli/conf.d/99-v8js.ini && \
     rm -fR /usr/local/src/v8js && \
     service nginx reload
