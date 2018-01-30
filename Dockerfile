@@ -2,40 +2,56 @@ FROM studionone/nginx-php7:latest
 
 MAINTAINER Greg Beaven <greg@studionone.com.au>
 
-RUN apt-get update && apt-get install -y git \
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
     python \
-    gcc \
-    make \
-    g++ \
     wget \
-    php7.0-dev
-
-# install dependencies
-RUN apt-get update
-RUN apt-get -y install git subversion make g++ python curl chrpath && apt-get clean
+    curl \
+    chrpath \
+    libglib2.0-dev \
+    php7.1-dev
 
 # depot tools
 RUN git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git /usr/local/depot_tools
 ENV PATH $PATH:/usr/local/depot_tools
+ENV NO_INTERACTION 1
 
 # install v8
-RUN cd /usr/local/src && fetch v8 && \
-    cd /usr/local/src/v8 && git checkout 4.9.111 && gclient sync && make x64.release library=shared snapshot=off -j4 && \
-    mkdir -p /usr/local/lib && \
-    cp /usr/local/src/v8/out/x64.release/lib.target/lib*.so /usr/local/lib && \
-    echo "create /usr/local/lib/libv8_libplatform.a\naddlib /usr/local/src/v8/out/x64.release/obj.target/tools/gyp/libv8_libplatform.a\nsave\nend" | ar -M && \
-    cp -R /usr/local/src/v8/include /usr/local && \
-    chrpath -r '$ORIGIN' /usr/local/lib/libv8.so && \
-    rm -fR /usr/local/src/v8
+WORKDIR /usr/local/src
+RUN fetch v8
+WORKDIR v8 
+RUN git checkout 6.4.388.18
+RUN ls tools/dev
+#RUN gclient help
+
+RUN tools/dev/v8gen.py -vv x64.release -- is_component_build=true
+
+# Build
+RUN ninja -C out.gn/x64.release/
+#RUN mkdir -p /usr/local/{lib,include}
+
+RUN mkdir -p /opt/v8/lib
+RUN mkdir -p /opt/v8/include
+
+RUN cp out.gn/x64.release/lib*.so out.gn/x64.release/*_blob.bin \
+    out.gn/x64.release/icudtl.dat /opt/v8/lib/
+    
+RUN cp -R include/* /opt/v8/include/
 
 # get v8js, compile and install
-ENV NO_INTERACTION 1
-RUN git clone https://github.com/preillyme/v8js.git /usr/local/src/v8js && \
-    cd /usr/local/src/v8js && phpize && ./configure --with-v8js=/usr/local && \
+
+RUN git clone https://github.com/phpv8/v8js.git /usr/local/src/v8js
+WORKDIR /usr/local/src/v8js
+RUN git fetch --tags && \
+    git checkout tags/2.1.0 && \
+    phpize && \
+    ./configure --with-v8js=/opt/v8 && \
     make all test install && \
-    echo extension=v8js.so > /etc/php/7.0/cli/conf.d/99-v8js.ini && \
-    echo extension=v8js.so > /etc/php/7.0/fpm/conf.d/99-v8js.ini && \
-    chmod 0777 /etc/php/7.0/fpm/conf.d/99-v8js.ini && \
-    chmod 0777 /etc/php/7.0/cli/conf.d/99-v8js.ini && \
-    rm -fR /usr/local/src/v8js && \
-    service nginx reload
+    echo extension=v8js.so > /etc/php/7.1/cli/conf.d/99-v8js.ini && \
+    echo extension=v8js.so > /etc/php/7.1/fpm/conf.d/99-v8js.ini && \
+    chmod 0777 /etc/php/7.1/fpm/conf.d/99-v8js.ini && \
+    chmod 0777 /etc/php/7.1/cli/conf.d/99-v8js.ini && \
+    rm -fR /usr/local/src/v8js
+
+RUN service nginx reload
