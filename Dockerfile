@@ -1,7 +1,5 @@
 FROM studionone/nginx-php7:latest
 
-MAINTAINER Greg Beaven <greg@studionone.com.au>
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
@@ -15,7 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 ENV PATH $PATH:/usr/local/depot_tools
-ENV NO_INTERACTION 1
 
 # depot tools
 RUN git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git /usr/local/depot_tools && \
@@ -44,8 +41,8 @@ RUN git clone -b 2.1.0 --single-branch https://github.com/phpv8/v8js.git /usr/lo
     make all test install && \
     echo extension=v8js.so > /etc/php/7.1/cli/conf.d/99-v8js.ini && \
     echo extension=v8js.so > /etc/php/7.1/fpm/conf.d/99-v8js.ini && \
-    chmod 0777 /etc/php/7.1/fpm/conf.d/99-v8js.ini && \
-    chmod 0777 /etc/php/7.1/cli/conf.d/99-v8js.ini && \
+    chmod 0755 /etc/php/7.1/fpm/conf.d/99-v8js.ini && \
+    chmod 0755 /etc/php/7.1/cli/conf.d/99-v8js.ini && \
     rm -rf /usr/local/src/v8js
 
 RUN service nginx reload
