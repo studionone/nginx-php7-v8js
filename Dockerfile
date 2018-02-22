@@ -21,7 +21,6 @@ RUN git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git /
     fetch v8 && \
     cd v8 && \
     git checkout 6.5-lkgr && \
-    ls tools/dev && \
     gclient sync && \
     tools/dev/v8gen.py -vv x64.release -- is_component_build=true && \
     # Build
