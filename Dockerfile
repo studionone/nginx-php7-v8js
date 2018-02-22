@@ -1,41 +1,47 @@
 FROM studionone/nginx-php7:latest
 
-MAINTAINER Greg Beaven <greg@studionone.com.au>
-
-RUN apt-get update && apt-get install -y git \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
     python \
-    gcc \
-    make \
-    g++ \
     wget \
-    php7.0-dev
+    chrpath \
+    libglib2.0-dev \
+    php7.1-dev && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# install dependencies
-RUN apt-get update
-RUN apt-get -y install git subversion make g++ python curl chrpath && apt-get clean
-
-# depot tools
-RUN git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git /usr/local/depot_tools
 ENV PATH $PATH:/usr/local/depot_tools
 
-# install v8
-RUN cd /usr/local/src && fetch v8 && \
-    cd /usr/local/src/v8 && git checkout 4.9.111 && gclient sync && make x64.release library=shared snapshot=off -j4 && \
-    mkdir -p /usr/local/lib && \
-    cp /usr/local/src/v8/out/x64.release/lib.target/lib*.so /usr/local/lib && \
-    echo "create /usr/local/lib/libv8_libplatform.a\naddlib /usr/local/src/v8/out/x64.release/obj.target/tools/gyp/libv8_libplatform.a\nsave\nend" | ar -M && \
-    cp -R /usr/local/src/v8/include /usr/local && \
-    chrpath -r '$ORIGIN' /usr/local/lib/libv8.so && \
-    rm -fR /usr/local/src/v8
+# depot tools
+RUN git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git /usr/local/depot_tools && \
+    # install v8
+    cd /usr/local/src && \
+    fetch v8 && \
+    cd v8 && \
+    git checkout 6.5-lkgr && \
+    gclient sync && \
+    tools/dev/v8gen.py -vv x64.release -- is_component_build=true && \
+    # Build
+    ninja -C out.gn/x64.release/ && \
+    mkdir -p /opt/v8/lib && \
+    mkdir -p /opt/v8/include && \
+    cp out.gn/x64.release/lib*.so out.gn/x64.release/*_blob.bin \
+    out.gn/x64.release/icudtl.dat /opt/v8/lib/ && \
+    cp -R include/* /opt/v8/include/ && \
+    rm -rf /usr/local/depot_tools /usr/local/src/v8
 
 # get v8js, compile and install
-ENV NO_INTERACTION 1
-RUN git clone https://github.com/preillyme/v8js.git /usr/local/src/v8js && \
-    cd /usr/local/src/v8js && phpize && ./configure --with-v8js=/usr/local && \
+RUN git clone -b 2.1.0 --single-branch https://github.com/phpv8/v8js.git /usr/local/src/v8js && \
+    cd /usr/local/src/v8js && \
+    phpize && \
+    ./configure --with-v8js=/opt/v8 && \
     make all test install && \
-    echo extension=v8js.so > /etc/php/7.0/cli/conf.d/99-v8js.ini && \
-    echo extension=v8js.so > /etc/php/7.0/fpm/conf.d/99-v8js.ini && \
-    chmod 0777 /etc/php/7.0/fpm/conf.d/99-v8js.ini && \
-    chmod 0777 /etc/php/7.0/cli/conf.d/99-v8js.ini && \
-    rm -fR /usr/local/src/v8js && \
-    service nginx reload
+    echo extension=v8js.so > /etc/php/7.1/cli/conf.d/99-v8js.ini && \
+    echo extension=v8js.so > /etc/php/7.1/fpm/conf.d/99-v8js.ini && \
+    chmod 0755 /etc/php/7.1/fpm/conf.d/99-v8js.ini && \
+    chmod 0755 /etc/php/7.1/cli/conf.d/99-v8js.ini && \
+    rm -rf /usr/local/src/v8js
+
+RUN service nginx reload
