@@ -1,4 +1,4 @@
-FROM studionone/nginx-php7:latest
+FROM studionone/nginx-php:7.1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -20,7 +20,7 @@ RUN git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git /
     cd /usr/local/src && \
     fetch v8 && \
     cd v8 && \
-    git checkout 6.5-lkgr && \
+    git checkout 6.6-lkgr && \
     gclient sync && \
     tools/dev/v8gen.py -vv x64.release -- is_component_build=true && \
     # Build
